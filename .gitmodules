@@ -1,0 +1,9 @@
+[submodule "backend/tutorium-user-service"]
+	path = backend/tutorium-user-service
+	url = https://github.com/mondblad/tutorium-user-service.git
+[submodule "backend/tutorium-auth-service"]
+	path = backend/tutorium-auth-service
+	url = https://github.com/mondblad/tutorium-auth-service.git
+[submodule "frontend/tutorium-frontend"]
+	path = frontend/tutorium-frontend
+	url = https://github.com/mondblad/tutorium-frontend.git
