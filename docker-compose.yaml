@@ -37,8 +37,7 @@ services:
       context: ./frontend/tutorium-frontend
       dockerfile: Dockerfile
       args:
-        VITE_AUTH_API: http://localhost:${TUTORIUM_AUTH_SERVICE_PORT}
-        VITE_USER_API: http://localhost:${TUTORIUM_USER_SERVICE_PORT}
+        MODE: docker
     ports:
       - "${TUTORIUM_FRONTEND_PORT}:${TUTORIUM_FRONTEND_PORT}"   
 
