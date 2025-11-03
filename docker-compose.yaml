@@ -1,0 +1,85 @@
+services:
+  db:
+    container_name: tutorium-db
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=${TUTORIUM_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${TUTORIUM_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${TUTORIUM_POSTGRES_DB}
+    ports:
+      - "${TUTORIUM_POSTGRES_DB_PORT}:${TUTORIUM_POSTGRES_DB_PORT}"
+    volumes:
+      - pgData:/var/lib/postgresql/data
+  
+  tutorium-auth-service:
+    container_name: tutorium-auth-service
+    build:
+      context: ./backend/tutorium-auth-service
+      dockerfile: Tutorium.AuthService/Dockerfile
+    ports:
+      - "${TUTORIUM_AUTH_SERVICE_PORT}:${TUTORIUM_AUTH_SERVICE_PORT}"   
+    environment:
+      - ASPNETCORE_URLS=http://+:${TUTORIUM_AUTH_SERVICE_PORT}
+  
+  tutorium-user-service:
+    container_name: tutorium-user-service
+    build:
+      context: ./backend/tutorium-user-service
+      dockerfile: Tutorium.UserService/Dockerfile
+    ports:
+      - "${TUTORIUM_USER_SERVICE_PORT}:${TUTORIUM_USER_SERVICE_PORT}"   
+    environment:
+      - ASPNETCORE_URLS=http://+:${TUTORIUM_USER_SERVICE_PORT}
+
+  tutorium-frontend:
+    container_name: tutorium-frontend
+    build:
+      context: ./frontend/tutorium-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_AUTH_API: http://localhost:${TUTORIUM_AUTH_SERVICE_PORT}
+        VITE_USER_API: http://localhost:${TUTORIUM_USER_SERVICE_PORT}
+    ports:
+      - "${TUTORIUM_FRONTEND_PORT}:${TUTORIUM_FRONTEND_PORT}"   
+
+  tutorium-zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: tutorium-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: ${TUTORIUM_ZOOKEEPER_PORT}
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "${TUTORIUM_ZOOKEEPER_PORT}:${TUTORIUM_ZOOKEEPER_PORT}"
+
+  tutorium-kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: tutorium-kafka
+    depends_on:
+      - tutorium-zookeeper
+    ports:
+      - "${TUTORIUM_KAFKA_LOCAL_PORT}:${TUTORIUM_KAFKA_LOCAL_PORT}"
+      - "${TUTORIUM_KAFKA_PORT}:${TUTORIUM_KAFKA_PORT}"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: tutorium-zookeeper:${TUTORIUM_ZOOKEEPER_PORT}
+      KAFKA_LISTENERS: INTERNAL://tutorium-kafka:${TUTORIUM_KAFKA_PORT},EXTERNAL://0.0.0.0:${TUTORIUM_KAFKA_LOCAL_PORT}
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://tutorium-kafka:${TUTORIUM_KAFKA_PORT},EXTERNAL://localhost:${TUTORIUM_KAFKA_LOCAL_PORT}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  tutorium-kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: tutorium-kafka-ui
+    depends_on:
+      - tutorium-kafka
+    ports:
+      - "${TUTORIUM_KAFKA_UI_PORT}:${TUTORIUM_KAFKA_UI_PORT}"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: tutorium-kafka:${TUTORIUM_KAFKA_PORT}
+      KAFKA_CLUSTERS_0_ZOOKEEPER: tutorium-zookeeper:${TUTORIUM_ZOOKEEPER_PORT}
+
+volumes:
+  pgData:
+    driver: local
