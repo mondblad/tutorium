@@ -67,17 +67,18 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  tutorium-kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: tutorium-kafka-ui
+  tutorium-akhq:
+    image: tchiotludo/akhq
+    container_name: tutorium-akhq
+    ports:
+      - "${TUTORIUM_AKHQ_PORT}:${TUTORIUM_AKHQ_PORT}"
+    environment:
+      AKHQ_CONNECTIONS_LOCAL_PROPERTIES_BOOTSTRAP_SERVERS: tutorium-kafka:${TUTORIUM_KAFKA_PORT}
+      AKHQ_CONFIGURATION_CONNECTIONS_DEFAULT_PROPERTIES_AUTO_CREATE_TOPICS: "true"
     depends_on:
       - tutorium-kafka
-    ports:
-      - "${TUTORIUM_KAFKA_UI_PORT}:${TUTORIUM_KAFKA_UI_PORT}"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: tutorium-kafka:${TUTORIUM_KAFKA_PORT}
-      KAFKA_CLUSTERS_0_ZOOKEEPER: tutorium-zookeeper:${TUTORIUM_ZOOKEEPER_PORT}
+    volumes:
+      - ./app/application.yml:/app/application.yml
 
 volumes:
   pgData:
