@@ -1,1 +1,6 @@
 .env.local
+
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*

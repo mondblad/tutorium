@@ -11,7 +11,7 @@ services:
     volumes:
       - pgData:/var/lib/postgresql/data
   
-  tutorium-auth-service:
+  auth-service:
     container_name: tutorium-auth-service
     build:
       context: ./backend/tutorium-auth-service
@@ -21,7 +21,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:${TUTORIUM_AUTH_SERVICE_PORT}
   
-  tutorium-user-service:
+  user-service:
     container_name: tutorium-user-service
     build:
       context: ./backend/tutorium-user-service
@@ -31,7 +31,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:${TUTORIUM_USER_SERVICE_PORT}
 
-  tutorium-frontend:
+  frontend:
     container_name: tutorium-frontend
     build:
       context: ./frontend/tutorium-frontend
@@ -41,44 +41,54 @@ services:
     ports:
       - "${TUTORIUM_FRONTEND_PORT}:${TUTORIUM_FRONTEND_PORT}"   
 
-  tutorium-zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: tutorium-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: ${TUTORIUM_ZOOKEEPER_PORT}
-      ZOOKEEPER_TICK_TIME: 2000
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    container_name: kafka-zookeeper
     ports:
-      - "${TUTORIUM_ZOOKEEPER_PORT}:${TUTORIUM_ZOOKEEPER_PORT}"
+      - "2181:2181"
 
-  tutorium-kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: tutorium-kafka
-    depends_on:
-      - tutorium-zookeeper
+  kafka:
+    image: wurstmeister/kafka:latest
+    container_name: kafka
     ports:
-      - "${TUTORIUM_KAFKA_LOCAL_PORT}:${TUTORIUM_KAFKA_LOCAL_PORT}"
-      - "${TUTORIUM_KAFKA_PORT}:${TUTORIUM_KAFKA_PORT}"
+      - "29092:29092"
+      - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: tutorium-zookeeper:${TUTORIUM_ZOOKEEPER_PORT}
-      KAFKA_LISTENERS: INTERNAL://tutorium-kafka:${TUTORIUM_KAFKA_PORT},EXTERNAL://0.0.0.0:${TUTORIUM_KAFKA_LOCAL_PORT}
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://tutorium-kafka:${TUTORIUM_KAFKA_PORT},EXTERNAL://localhost:${TUTORIUM_KAFKA_LOCAL_PORT}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
 
-  tutorium-akhq:
-    image: tchiotludo/akhq
-    container_name: tutorium-akhq
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
     ports:
-      - "${TUTORIUM_AKHQ_PORT}:${TUTORIUM_AKHQ_PORT}"
+      - "8080:8080"
     environment:
-      AKHQ_CONNECTIONS_LOCAL_PROPERTIES_BOOTSTRAP_SERVERS: tutorium-kafka:${TUTORIUM_KAFKA_PORT}
-      AKHQ_CONFIGURATION_CONNECTIONS_DEFAULT_PROPERTIES_AUTO_CREATE_TOPICS: "true"
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     depends_on:
-      - tutorium-kafka
+      - kafka
+      - zookeeper
+
+  kafka-init:
+    image: hashicorp/terraform:latest
+    container_name: kafka-terraform
     volumes:
-      - ./app/application.yml:/app/application.yml
+      - ./Kafka/Terraform/:/workspace
+    working_dir: /workspace
+    entrypoint: ["/bin/sh", "-c", "\
+      echo 'Waiting for Kafka...'; \
+      while ! nc -z kafka 9092; do sleep 1; done; \
+      terraform init && terraform apply -auto-approve -var-file=\"/workspace/vars/docker.tfvars\""]
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - zookeeper
 
 volumes:
   pgData:
